@@ -7,6 +7,7 @@ import {
 import {
   BACKGROUND_RUN_TRIGGERS,
   displayName,
+  inferBotRoleFromName,
   isBackgroundRunTrigger,
   phoneCallSettings,
   ringingCall,
@@ -545,6 +546,9 @@ export function createRepos(
       const envKind = process.env.SANDBOX_PROVIDER ?? "docker";
       const kind =
         envKind === "docker" && settings?.computerHost === "this-mac" ? "desktop" : envKind;
+      const inferredRole = process.env.RAKAZO_BOT_ROLE_AUTOFILL === "true"
+        ? inferBotRoleFromName(input.name)
+        : null;
       const insertBot = () =>
         prisma.$transaction(async (tx) => {
           await lockSpaceForContentCreation(tx, {
@@ -576,9 +580,12 @@ export function createRepos(
               spaceId: actor.spaceId,
               userId: actor.userId,
               name: displayName(input.name, ""),
-              title: displayName(input.title, ""),
-              description: input.description,
-              instructions: input.instructions,
+              title: input.title.trim() ? displayName(input.title, "") :
+                inferredRole?.title ?? displayName(input.title, ""),
+              description: input.description.trim() ? input.description :
+                inferredRole?.description ?? input.description,
+              instructions: input.instructions.trim() ? input.instructions :
+                inferredRole?.instructions ?? input.instructions,
               notifyOnFinish: input.notifyOnFinish,
               fleetManagement: input.fleetManagement,
               color: avatar.color,
