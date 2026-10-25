@@ -1,16 +1,16 @@
 # Independent Rakazo fork
 
-This fork is based on a specific upstream `main` commit, rather than copying locally patched production JavaScript. Keep the group, native MCP and native keyboard changes in separate development branches; the `feat/rakazo-unified-fork` branch merges all three so an ordinary checkout contains everything.
+This fork is based on a specific upstream `main` commit, rather than copying locally patched production JavaScript. Keep the group, native MCP and native keyboard changes in separate development branches; the `feat/unified-upstream-main` branch merges all three onto the latest fetched upstream `main`. The fork `main` stays an unmodified mirror of upstream.
 
 ## Included changes
 
-- **Group collaboration** (`feat/independent-group-orchestration`): bounded fan-out, original-owner synthesis and up to three follow-up assessments. Group names are supplied as untrusted context rather than special routing flags. Explicit `@BotName` requests choose participating peers; otherwise roster order is used, limited to four by default. The owner may use the existing handoff tool for a targeted follow-up. This is **not** an unconstrained autonomous conversation planner.
+- **Group collaboration** (`feat/independent-group-orchestration`): bounded fan-out, original-owner synthesis and up to three follow-up assessments. Group names are supplied as untrusted context rather than special routing flags. Explicit `@BotName` requests choose participating peers; otherwise all remaining active group members participate in roster order. There is no additional dispatcher headcount cap; the upstream group creation contract currently accepts two to ten bots. The owner may use the existing handoff tool for a targeted follow-up. This is **not** an unconstrained autonomous conversation planner.
 - **Native MCP authentication** (`feat/native-mcp-authentication`): bearer, optional authentication, and encrypted API keys sent using configurable header names. The OAuth option creates a registered remote MCP server and opens the official Rakazo Web callback in the device browser. The browser must be signed into the same instance; the completed callback is handled by the server. No access tokens or client secrets are committed.
 - **Native Android keyboard behavior** (`fix/android-keyboard-follow`): use the native `KeyboardAvoidingView.automaticOffset` so Android reads the view's current window coordinates instead of stale JavaScript measurements. Preserve the existing iOS header behavior. Native-device smoke testing is still necessary across software keyboards and window sizes.
 
 ## Reproducing group functionality on a new host
 
-1. Check out a reviewed commit from `feat/rakazo-unified-fork` (or just the group branch), and install the version of Node required by `package.json` plus the locked pnpm version.
+1. Check out a reviewed commit from `feat/unified-upstream-main` (or just the group branch), and install the version of Node required by `package.json` plus the locked pnpm version.
 2. Copy the standard self-host environment sample privately and configure authentication, database, and service credentials. Do not put `.env`, credentials, or runtime data in Git.
 3. Run `pnpm install --frozen-lockfile` and `bash scripts/verify-fork.sh` before deploying.
 4. Build `rakazo/app:independent-groups` using `infra/compose/Dockerfile.orchestrator-local` and the exact source revision. See `docs/local-agent-team-orchestration.md` for the Docker build and opt-in Compose commands.

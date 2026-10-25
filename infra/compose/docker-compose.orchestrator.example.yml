@@ -12,7 +12,6 @@ services:
       RAKAZO_BOT_ROLE_AUTOFILL: "true"
       RAKAZO_GROUP_REVIEW_ENABLED: "true"
       RAKAZO_GROUP_HANDOFF_CONTEXT: "true"
-      RAKAZO_GROUP_TEAM_MAX_DELEGATES: ${RAKAZO_GROUP_TEAM_MAX_DELEGATES:-4}
       # Required: set to the *new rollout* UTC timestamp, never a historical date.
       RAKAZO_GROUP_REVIEW_SINCE: ${RAKAZO_GROUP_REVIEW_SINCE:?Set the UTC rollout cutoff}
   web:

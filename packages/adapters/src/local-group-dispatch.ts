@@ -15,8 +15,6 @@ import { getLogger } from "@rakazo/logging";
 const FANOUT_NONCE_PREFIX = "local-group-team:";
 const FANOUT_NONCE_REGEX = /^local-group-team:([a-z0-9]+):([a-z0-9]+)$/;
 const GOAL_CHECKPOINT_NONCE_PREFIX = "local-agent-goal:";
-const MAX_DELEGATES = 8;
-const DEFAULT_DELEGATES = 4;
 
 /** An explicit @Bot mention is a requested participant, not permission to run a tool. */
 export function requestedGroupParticipants(
@@ -44,11 +42,6 @@ export function requestedGroupParticipants(
     .map((member) => member.id);
 }
 
-export function groupDelegateLimit(env: NodeJS.ProcessEnv = process.env): number {
-  const raw = env.RAKAZO_GROUP_TEAM_MAX_DELEGATES;
-  if (!raw || !/^[1-9]\d*$/.test(raw)) return DEFAULT_DELEGATES;
-  return Math.min(Number(raw), MAX_DELEGATES);
-}
 const MAX_AGE_MS = 40 * 60_000;
 
 export function peerJobNonce(rootId: string, botId: string): string {
@@ -64,14 +57,14 @@ export function chooseGroupTeammates(
   members: readonly Teammate[],
   rootBotId: string,
   requestedIds: readonly string[] = [],
-  limit = groupDelegateLimit(),
 ): Teammate[] {
-  // Preserve the user-defined membership order and professional identity.
-  // For ordinary groups every *other* member participates as a peer.
-  // This is a bounded orchestration choice, not a hardcoded set of professions.
-  const eligible = members.filter((m) => m.id !== rootBotId);
-  const requested = eligible.filter((m) => requestedIds.includes(m.id));
-  return (requested.length ? requested : eligible).slice(0, limit);
+  // Membership (and explicit user mentions) determines participation. There is
+  // no arbitrary 4/8-person cap: the worker's existing job queue controls how
+  // much runs concurrently. The root is never scheduled as its own peer.
+  const eligible = members.filter((member) => member.id !== rootBotId);
+  return requestedIds.length
+    ? eligible.filter((member) => requestedIds.includes(member.id))
+    : eligible;
 }
 
 function peerTaskPrompt(peer: Teammate, groupName: string): string {
