@@ -8,7 +8,12 @@ const workflow = readFileSync(
 );
 const easConfig = JSON.parse(
   readFileSync(path.resolve(import.meta.dirname, "../eas.json"), "utf8"),
-) as { build: Record<string, { extends?: string; channel?: string; environment?: string; android?: { buildType?: string } }> };
+) as {
+  build: Record<
+    string,
+    { extends?: string; channel?: string; environment?: string; android?: { buildType?: string } }
+  >;
+};
 
 describe("Android APK release workflow", () => {
   it("only runs on demand from main with release credentials", () => {
