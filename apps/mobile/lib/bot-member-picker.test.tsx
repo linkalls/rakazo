@@ -76,6 +76,14 @@ vi.mock("./i18n", () => ({
 }));
 vi.mock("../components/glass-title", () => ({ glassHeaderOptions: () => ({}) }));
 vi.mock("../components/bot-avatar", () => ({ BotAvatar: () => null }));
+vi.mock("../components/group-avatar", () => ({
+  GroupAvatar: ({ members }: { members: { botId: string }[] }) => (
+    <span
+      data-testid="group-avatar"
+      data-members={members.map((member) => member.botId).join(",")}
+    />
+  ),
+}));
 vi.mock("../components/native-action-button", () => ({
   NativeActionButton: ({
     label,
@@ -210,6 +218,16 @@ it("limits additions while still allowing members to be removed", async () => {
 function openButtons() {
   return [...container.querySelectorAll<HTMLButtonElement>("button[aria-label]")];
 }
+
+it("updates the group icon preview while changing membership", async () => {
+  await act(async () => root.render(<GroupSettings />));
+  const preview = () => container.querySelector('[data-testid="group-avatar"]');
+  expect(preview()?.getAttribute("data-members")).toBe("bot-1,bot-2");
+  await act(async () => switches()[1]!.click());
+  expect(preview()?.getAttribute("data-members")).toBe("bot-1");
+  await act(async () => switches()[1]!.click());
+  expect(preview()?.getAttribute("data-members")).toBe("bot-1,bot-2");
+});
 
 it("opens a member's profile from group settings without touching membership", async () => {
   await act(async () => root.render(<GroupSettings />));

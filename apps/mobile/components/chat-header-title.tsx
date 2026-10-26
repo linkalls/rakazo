@@ -105,7 +105,9 @@ export function ChatHeaderTitle({
         {!inGroup && params.botId ? (
           <ChatTitleAvatar bot={title.bot} status={title.status} composing={title.composing} />
         ) : null}
-        {members ? <GroupSeats members={members} size={CHAT_TITLE_AVATAR_SIZE} /> : null}
+        {/* An invite or notification can open a group before its roster arrives.
+            Keep the group's own mark visible instead of leaving an empty gap. */}
+        {inGroup ? <GroupSeats members={members ?? []} size={CHAT_TITLE_AVATAR_SIZE} /> : null}
         <ChatTitleLabel label={label} placeholder={!title.name} style={styles.title} />
       </GlassSurface>
     </Pressable>

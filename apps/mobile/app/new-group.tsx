@@ -167,7 +167,7 @@ export default function NewGroup() {
               <View style={{ alignItems: "center", marginTop: 24, marginBottom: 32 }}>
                 <GroupAvatar
                   size={120}
-                  members={picked.slice(0, 3).map((bot) => ({ botId: bot.id, color: bot.color }))}
+                  members={picked.map((bot) => ({ botId: bot.id, color: bot.color }))}
                 />
               </View>
               <TextInput
@@ -186,10 +186,12 @@ export default function NewGroup() {
                 onSubmitEditing={() => void create()}
                 style={{
                   height: 56,
-                  borderRadius: 11,
-                  backgroundColor: native.fill,
+                  borderRadius: 18,
+                  borderWidth: 1,
+                  borderColor: tokens.border,
+                  backgroundColor: native.groupedCell,
                   color: tokens.foreground,
-                  fontSize: 22,
+                  fontSize: 20,
                   fontWeight: "600",
                   textAlign: "center",
                   paddingHorizontal: 14,

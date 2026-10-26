@@ -1,9 +1,10 @@
 import { GROUP_MEMBER_MAX, GROUP_MEMBER_MIN, GROUP_NAME_MAX_LENGTH } from "@rakazo/contracts";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { ScrollView, Text, TextInput } from "react-native";
+import { ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { BotMemberPicker } from "../components/bot-member-picker";
 import { glassHeaderOptions } from "../components/glass-title";
+import { GroupAvatar } from "../components/group-avatar";
 import { NativeActionButton } from "../components/native-action-button";
 import type { MobileBot, MobileGroup } from "../lib/api";
 import { rpc } from "../lib/api";
@@ -45,6 +46,13 @@ export default function GroupSettingsScreen() {
       .catch((err) => setError(errorText(err, t("Could not load group"))));
   }, [groupId]);
 
+  const previewMembers = selected.flatMap((botId) => {
+    const bot = bots.find((candidate) => candidate.id === botId);
+    if (bot) return [{ botId, name: bot.name, color: bot.color, status: bot.status }];
+    const member = group?.members.find((candidate) => candidate.botId === botId);
+    return member ? [{ botId, name: member.name, color: member.color }] : [];
+  });
+
   async function save() {
     if (!groupId || !group || pending) return;
     setPending(true);
@@ -82,22 +90,31 @@ export default function GroupSettingsScreen() {
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
       >
-        <Text style={{ color: tokens.mutedForeground, fontSize: 14 }}>{t("Name")}</Text>
+        <View style={styles.profileHeader}>
+          <GroupAvatar members={previewMembers} size={92} />
+        </View>
+        <Text
+          accessibilityRole="header"
+          style={[styles.fieldLabel, { color: tokens.mutedForeground }]}
+        >
+          {t("Name")}
+        </Text>
         <TextInput
+          accessibilityLabel={t("Group name")}
           value={name}
           onChangeText={setName}
           maxLength={GROUP_NAME_MAX_LENGTH}
           placeholder={t("Group name")}
           placeholderTextColor={tokens.mutedForeground}
           returnKeyType="done"
-          style={{
-            marginTop: 8,
-            backgroundColor: native.fill,
-            borderRadius: 11,
-            padding: 14,
-            color: tokens.foreground,
-            fontSize: 16,
-          }}
+          style={[
+            styles.nameInput,
+            {
+              color: tokens.foreground,
+              backgroundColor: native.groupedCell,
+              borderColor: tokens.border,
+            },
+          ]}
         />
         {group ? (
           <BotMemberPicker
@@ -127,9 +144,26 @@ export default function GroupSettingsScreen() {
           label={t("Delete group")}
           onPress={remove}
           prominence="destructive"
-          style={{ marginTop: 16 }}
+          style={{ marginTop: 28 }}
         />
       </ScrollView>
     </>
   );
 }
+
+const styles = StyleSheet.create({
+  profileHeader: {
+    alignItems: "center",
+    paddingTop: 12,
+    paddingBottom: 28,
+  },
+  fieldLabel: { fontSize: 13, fontWeight: "600", marginBottom: 9 },
+  nameInput: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 18,
+    minHeight: 56,
+    paddingHorizontal: 16,
+    fontSize: 17,
+    fontWeight: "500",
+  },
+});
