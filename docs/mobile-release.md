@@ -56,6 +56,46 @@ through the over-the-air updates below without a new APK. A Google Play install
 is signed with Play's key, so switching from the APK to Play means uninstalling
 the APK first.
 
+## Building Android APKs from a fork
+
+The existing `release-android-apk` GitHub Actions workflow also runs in forks.
+A fork selects the `fork-android-apk` EAS build profile automatically. This
+profile retains the original Expo project and Android package, but embeds a
+separate `fork` OTA update channel so upstream production JavaScript updates
+cannot overwrite the fork's native build.
+
+To use the **same Android signing certificate** as the original APK:
+
+1. Obtain authorized build access to the existing Expo project and its
+   EAS-managed Android keystore from the project's owners. Repository access
+   by itself does not grant Expo build access.
+2. Add an `EXPO_TOKEN` Actions **repository secret** to the fork. GitHub does
+   not transfer Actions secrets when a repository is forked. Never add Expo
+   tokens, keystore files, or passwords to Git.
+3. Confirm that the linked EAS `production` environment supplies
+   `EXPO_PUBLIC_API_URL` (HTTPS) and the `GOOGLE_SERVICES_JSON` file variable
+   required by the release workflow.
+4. From the fork's **Actions > release-android-apk > Run workflow**, select
+   `main`. The successful workflow updates the fork's own
+   `releases/download/android/rakazo.apk` download, not the upstream release.
+
+The fork's `main` CI intentionally does **not** publish updates to the original
+`production` EAS Update channel. After verifying the fork app, a maintainer
+with Expo access may publish a fork-only JavaScript update using:
+
+```sh
+cd apps/mobile
+eas update --platform android --channel fork --environment production --message "Fork update"
+```
+
+The `fork` channel must point to the intended EAS Update branch. Verify that
+mapping before publishing. The APK uses the original Android package name, so
+it cannot be installed alongside the original app. Updating in place requires
+the same signing certificate and a compatible, higher Android version code.
+If the original Expo project is inaccessible, do not replace it with another
+project while claiming update compatibility: a different signing key may
+require an uninstall and will not be an in-place update.
+
 ## Android push
 
 For Android push notifications, create a Firebase project and register the app's
