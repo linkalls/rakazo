@@ -20,6 +20,8 @@ jobs:
       contents: write
     env:
       RELEASE_TAG: android
+      # Forks use the same EAS-managed signing key with an isolated OTA channel.
+      EAS_BUILD_PROFILE: ${{ github.event.repository.fork && 'fork-android-apk' || 'android-apk' }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
@@ -67,7 +69,7 @@ jobs:
         working-directory: apps/mobile
         run: |
           set -euo pipefail
-          eas build --platform android --profile android-apk --non-interactive --wait --json > "$RUNNER_TEMP/build.json"
+          eas build --platform android --profile "$EAS_BUILD_PROFILE" --non-interactive --wait --json > "$RUNNER_TEMP/build.json"
           url="$(jq -r '.[0].artifacts.applicationArchiveUrl // .[0].artifacts.buildUrl' "$RUNNER_TEMP/build.json")"
           version="$(jq -r '.[0].appVersion' "$RUNNER_TEMP/build.json")"
           version_code="$(jq -r '.[0].appBuildVersion' "$RUNNER_TEMP/build.json")"
