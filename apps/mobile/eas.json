@@ -30,6 +30,10 @@
     "diagnostic": {
       "extends": "production",
       "channel": "diagnostic"
+    },
+    "fork-android-apk": {
+      "extends": "android-apk",
+      "channel": "fork"
     }
   },
   "submit": {
