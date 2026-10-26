@@ -8,7 +8,7 @@ const workflow = readFileSync(
 );
 const easConfig = JSON.parse(
   readFileSync(path.resolve(import.meta.dirname, "../eas.json"), "utf8"),
-) as { build: Record<string, { extends?: string; android?: { buildType?: string } }> };
+) as { build: Record<string, { extends?: string; channel?: string; environment?: string; android?: { buildType?: string } }> };
 
 describe("Android APK release workflow", () => {
   it("only runs on demand from main with release credentials", () => {
@@ -27,17 +27,25 @@ describe("Android APK release workflow", () => {
     }
   });
 
-  it("builds a production-channel APK and never takes the desktop updater's latest release", () => {
+  it("builds signed APKs on the original or isolated fork channel without replacing the latest desktop release", () => {
     expect(easConfig.build["android-apk"]).toEqual({
       extends: "production",
       android: { buildType: "apk" },
       environment: "production",
     });
-    expect(workflow).toContain("--profile android-apk");
+    // The original release keeps its production channel and the fork uses a distinct channel.
+    expect(easConfig.build["fork-android-apk"]).toEqual({
+      extends: "android-apk",
+      channel: "fork",
+    });
+    expect(workflow).toContain("github.event.repository.fork");
+    expect(workflow).toContain("'fork-android-apk' || 'android-apk'");
+    expect(workflow).toContain('--profile "$EAS_BUILD_PROFILE"');
     expect(workflow).toContain("--latest=false");
     expect(workflow).not.toContain("gh release delete");
-    expect(readFileSync(path.resolve(import.meta.dirname, "../app.config.ts"), "utf8")).toContain(
-      '"android-apk"',
-    );
+    const appConfig = readFileSync(path.resolve(import.meta.dirname, "../app.config.ts"), "utf8");
+    // Every profile that publishes a signed APK must enforce the production HTTPS API URL.
+    expect(appConfig).toContain('"android-apk"');
+    expect(appConfig).toContain('"fork-android-apk"');
   });
 });
