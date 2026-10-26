@@ -6,51 +6,34 @@ const workflow = readFileSync(
   path.resolve(import.meta.dirname, "../../../.github/workflows/release-android-apk.yml"),
   "utf8",
 );
-const easConfig = JSON.parse(
-  readFileSync(path.resolve(import.meta.dirname, "../eas.json"), "utf8"),
-) as {
-  build: Record<
-    string,
-    { extends?: string; channel?: string; environment?: string; android?: { buildType?: string } }
-  >;
-};
 
-describe("Android APK release workflow", () => {
-  it("only runs on demand from main with release credentials", () => {
+describe("independent Android fork APK workflow", () => {
+  it("is a manual fork-only build with no EAS Cloud or upstream credentials", () => {
     expect(workflow).toMatch(/^on:\n {2}workflow_dispatch:\n\n/m);
     expect(workflow).toContain("permissions:\n  contents: read");
-    expect(workflow).toContain("if: github.ref == 'refs/heads/main'");
+    expect(workflow).toContain("github.repository == 'linkalls/rakazo'");
+    expect(workflow).toContain("github.ref == 'refs/heads/main'");
     expect(workflow).toContain("persist-credentials: false");
-    expect(workflow).not.toContain("cache: pnpm");
+    expect(workflow).not.toContain("eas build");
+    expect(workflow).not.toContain("EXPO_TOKEN");
+    expect(workflow).not.toContain("expo/expo-github-action");
   });
 
-  it("pins every third-party action to an immutable commit", () => {
-    const actionReferences = [...workflow.matchAll(/uses:\s+([^\s#]+)/g)].map((match) => match[1]);
-    expect(actionReferences.length).toBeGreaterThan(0);
-    for (const reference of actionReferences) {
-      expect(reference, reference).toMatch(/@[0-9a-f]{40}$/);
-    }
+  it("pins third-party actions to immutable commits", () => {
+    const refs = [...workflow.matchAll(/uses:\s+([^\s#]+)/g)].map((match) => match[1]);
+    expect(refs.length).toBeGreaterThan(0);
+    for (const ref of refs) expect(ref).toMatch(/@[0-9a-f]{40}$/);
   });
 
-  it("builds signed APKs on the original or isolated fork channel without replacing the latest desktop release", () => {
-    expect(easConfig.build["android-apk"]).toEqual({
-      extends: "production",
-      android: { buildType: "apk" },
-      environment: "production",
-    });
-    // The original release keeps its production channel and the fork uses a distinct channel.
-    expect(easConfig.build["fork-android-apk"]).toEqual({
-      extends: "android-apk",
-      channel: "fork",
-    });
-    expect(workflow).toContain("github.event.repository.fork");
-    expect(workflow).toContain("'fork-android-apk' || 'android-apk'");
-    expect(workflow).toContain('--profile "$EAS_BUILD_PROFILE"');
+  it("signs from fixed private fork secrets and publishes an independent APK", () => {
+    expect(workflow).toContain("RAKAZO_FORK_APK");
+    expect(workflow).toContain("prebuild --platform android");
+    expect(workflow).toContain(":app:assembleRelease");
+    expect(workflow).toContain("FORK_ANDROID_KEYSTORE_B64");
+    expect(workflow).toContain("FORK_ANDROID_KEYSTORE_PASSWORD");
+    expect(workflow).toContain("configure-fork-android-signing.mjs");
+    expect(workflow).toContain("fork-android");
+    expect(workflow).toContain("rakazo-fork.apk");
     expect(workflow).toContain("--latest=false");
-    expect(workflow).not.toContain("gh release delete");
-    const appConfig = readFileSync(path.resolve(import.meta.dirname, "../app.config.ts"), "utf8");
-    // Every profile that publishes a signed APK must enforce the production HTTPS API URL.
-    expect(appConfig).toContain('"android-apk"');
-    expect(appConfig).toContain('"fork-android-apk"');
   });
 });

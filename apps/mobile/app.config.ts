@@ -37,6 +37,48 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     };
   }
 
+  // A fork-built APK is an independent Android application: it can coexist
+  // with the upstream app and must never consume upstream EAS/OTA updates.
+  if (process.env.RAKAZO_FORK_APK === "1") {
+    const versionCode = Number(process.env.RAKAZO_FORK_VERSION_CODE ?? "1001");
+    if (!Number.isSafeInteger(versionCode) || versionCode <= 0) {
+      throw new Error("RAKAZO_FORK_VERSION_CODE must be a positive integer.");
+    }
+    const { eas: _upstreamEas, ...forkExtra } = result.extra ?? {};
+    result = {
+      ...result,
+      name: "Rakazo Fork",
+      slug: "rakazo-fork",
+      owner: undefined,
+      scheme: "rakazofork",
+      icon: "./assets/fork-icon.png",
+      plugins: (result.plugins ?? []).map((plugin) =>
+        Array.isArray(plugin) && plugin[0] === "expo-splash-screen"
+          ? [
+              plugin[0],
+              {
+                ...(typeof plugin[1] === "object" ? plugin[1] : {}),
+                image: "./assets/fork-splash-icon.png",
+              },
+            ]
+          : plugin,
+      ),
+      android: {
+        ...result.android,
+        package: "com.linkalls.rakazo.fork",
+        icon: "./assets/fork-icon.png",
+        adaptiveIcon: {
+          foregroundImage: "./assets/fork-adaptive-icon.png",
+          monochromeImage: "./assets/fork-monochrome-icon.png",
+          backgroundImage: "./assets/fork-icon-background.png",
+        },
+        versionCode,
+      },
+      updates: { ...result.updates, enabled: false, url: undefined },
+      extra: { ...forkExtra, forkBuild: true },
+    };
+  }
+
   const googleServicesFile = process.env.GOOGLE_SERVICES_JSON;
   if (googleServicesFile) {
     result = { ...result, android: { ...result.android, googleServicesFile } };

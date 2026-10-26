@@ -56,45 +56,37 @@ through the over-the-air updates below without a new APK. A Google Play install
 is signed with Play's key, so switching from the APK to Play means uninstalling
 the APK first.
 
-## Building Android APKs from a fork
+## Independent local-Gradle APK from this fork
 
-The existing `release-android-apk` GitHub Actions workflow also runs in forks.
-A fork selects the `fork-android-apk` EAS build profile automatically. This
-profile retains the original Expo project and Android package, but embeds a
-separate `fork` OTA update channel so upstream production JavaScript updates
-cannot overwrite the fork's native build.
+The `linkalls/rakazo` fork uses a **fully local Android Gradle build on GitHub
+Actions runners**, not EAS Cloud and not the upstream Expo signing identity.
+Run **Actions > Build independent fork Android APK locally > Run workflow**
+on the fork's `main` branch. The runner executes Expo prebuild, then
+`./gradlew :app:assembleRelease` and publishes `rakazo-fork.apk` to the
+`fork-android` rolling GitHub Release (also as an Actions artifact).
 
-To use the **same Android signing certificate** as the original APK:
+The workflow embeds a separate application identity:
 
-1. Obtain authorized build access to the existing Expo project and its
-   EAS-managed Android keystore from the project's owners. Repository access
-   by itself does not grant Expo build access.
-2. Add an `EXPO_TOKEN` Actions **repository secret** to the fork. GitHub does
-   not transfer Actions secrets when a repository is forked. Never add Expo
-   tokens, keystore files, or passwords to Git.
-3. Confirm that the linked EAS `production` environment supplies
-   `EXPO_PUBLIC_API_URL` (HTTPS) and the `GOOGLE_SERVICES_JSON` file variable
-   required by the release workflow.
-4. From the fork's **Actions > release-android-apk > Run workflow**, select
-   `main`. The successful workflow updates the fork's own
-   `releases/download/android/rakazo.apk` download, not the upstream release.
+- Name: **Rakazo Fork** (purple custom launcher, adaptive, monochrome and splash icons).
+- Package: `com.linkalls.rakazo.fork` (original: `com.rakazo.app`).
+- URI scheme: `rakazofork` (original: `rakazo`).
+- Expo OTA: **disabled**. The fork never subscribes to original production updates.
+- Version code: increases with the GitHub Actions run number.
 
-The fork's `main` CI intentionally does **not** publish updates to the original
-`production` EAS Update channel. After verifying the fork app, a maintainer
-with Expo access may publish a fork-only JavaScript update using:
+To support reinstalling new builds without removing the prior fork build,
+GitHub repository Actions Secrets hold the **same reusable fork-only signing
+certificate**. They are named `FORK_ANDROID_KEYSTORE_B64` (base64-encoded
+PKCS#12) and `FORK_ANDROID_KEYSTORE_PASSWORD` (certificate password). The
+workflow never displays them, and the private key is never committed to Git.
+Keep these secrets backed up securely: losing them means a newly signed APK
+cannot replace an installed fork version in place. The original app is always
+a separate Android package and may be installed simultaneously.
 
-```sh
-cd apps/mobile
-eas update --platform android --channel fork --environment production --message "Fork update"
-```
-
-The `fork` channel must point to the intended EAS Update branch. Verify that
-mapping before publishing. The APK uses the original Android package name, so
-it cannot be installed alongside the original app. Updating in place requires
-the same signing certificate and a compatible, higher Android version code.
-If the original Expo project is inaccessible, do not replace it with another
-project while claiming update compatibility: a different signing key may
-require an uninstall and will not be an in-place update.
+The fork APK does not configure Firebase messaging by default. If push
+notifications are required, register the fork package in Firebase and provide
+a distinct Android `google-services.json` at build time. Native UI should be
+validated on a physical device; successful CI compilation does not prove all
+features work with self-hosted backend configurations.
 
 ## Android push
 

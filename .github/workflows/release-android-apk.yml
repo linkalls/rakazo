@@ -1,4 +1,4 @@
-name: release-android-apk
+name: Build independent fork Android APK locally
 
 on:
   workflow_dispatch:
@@ -7,132 +7,90 @@ permissions:
   contents: read
 
 concurrency:
-  group: release-android-apk
+  group: fork-android-release
   cancel-in-progress: false
 
 jobs:
-  release:
-    name: Build and publish the Android APK
-    if: github.ref == 'refs/heads/main'
+  apk:
+    if: github.repository == 'linkalls/rakazo' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     permissions:
       contents: write
     env:
-      RELEASE_TAG: android
-      # Forks use the same EAS-managed signing key with an isolated OTA channel.
-      EAS_BUILD_PROFILE: ${{ github.event.repository.fork && 'fork-android-apk' || 'android-apk' }}
+      CI: "1"
+      EXPO_NO_TELEMETRY: "1"
+      RAKAZO_FORK_APK: "1"
+      NODE_OPTIONS: --max-old-space-size=4096
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           persist-credentials: false
-
-      - name: Require Expo automation token
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: |
-          if [[ -z "$EXPO_TOKEN" ]]; then
-            echo "Add an EXPO_TOKEN repository secret with access to the inbox-zero/rakazo Expo project." >&2
-            exit 1
-          fi
-
       - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 24
-      - name: Set up Expo
-        uses: expo/expo-github-action@eab7a230208c952974db8c3245cfd78402c7b385 # v9
+          cache: pnpm
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
         with:
-          eas-version: latest
-          packager: pnpm
-          token: ${{ secrets.EXPO_TOKEN }}
+          distribution: temurin
+          java-version: "17"
+      - name: Set fork version code
+        run: echo "RAKAZO_FORK_VERSION_CODE=$((GITHUB_RUN_NUMBER + 1000))" >> "$GITHUB_ENV"
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Verify mobile project
-        run: pnpm --filter @rakazo/mobile check
-
-      # Without Firebase config the APK never registers for push, and an OTA update can't add it.
-      - name: Require Firebase config
-        working-directory: apps/mobile
+      - name: Verify isolated fork configuration
         run: |
           set -euo pipefail
-          vars="$(eas env:list production --format short)"
-          if ! grep -q '^GOOGLE_SERVICES_JSON=' <<< "$vars"; then
-            echo "Set the GOOGLE_SERVICES_JSON file variable in the EAS production environment (see docs/mobile-release.md)." >&2
-            exit 1
-          fi
-
-      # EAS signs with the project's managed Android keystore and bakes in the production update
-      # channel, so installed APKs receive the same OTA updates as store builds.
-      - name: Build APK on EAS
-        id: build
-        working-directory: apps/mobile
+          (cd apps/mobile && node node_modules/expo/bin/cli config --type public --json) > "$RUNNER_TEMP/mobile-config.json"
+          jq -e '.android.package == "com.linkalls.rakazo.fork" and .name == "Rakazo Fork" and .updates.enabled == false and (.extra.eas.projectId? == null)' "$RUNNER_TEMP/mobile-config.json"
+      - name: Generate native Android project without EAS
+        run: (cd apps/mobile && node node_modules/expo/bin/cli prebuild --platform android --no-install --clean)
+      - name: Install the reusable fork signing certificate
+        env:
+          FORK_ANDROID_KEYSTORE_B64: ${{ secrets.FORK_ANDROID_KEYSTORE_B64 }}
+          RAKAZO_FORK_KEYSTORE_PASSWORD: ${{ secrets.FORK_ANDROID_KEYSTORE_PASSWORD }}
         run: |
           set -euo pipefail
-          eas build --platform android --profile "$EAS_BUILD_PROFILE" --non-interactive --wait --json > "$RUNNER_TEMP/build.json"
-          url="$(jq -r '.[0].artifacts.applicationArchiveUrl // .[0].artifacts.buildUrl' "$RUNNER_TEMP/build.json")"
-          version="$(jq -r '.[0].appVersion' "$RUNNER_TEMP/build.json")"
-          version_code="$(jq -r '.[0].appBuildVersion' "$RUNNER_TEMP/build.json")"
-          if [[ -z "$url" || "$url" == "null" || "$url" != https://* ]]; then
-            echo "EAS did not return an APK download URL." >&2
-            exit 1
-          fi
-          curl --fail --location --silent --show-error --output "$RUNNER_TEMP/rakazo.apk" "$url"
-          if [[ "$(head -c 2 "$RUNNER_TEMP/rakazo.apk")" != "PK" ]]; then
-            echo "The downloaded artifact is not an APK." >&2
-            exit 1
-          fi
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "version_code=$version_code" >> "$GITHUB_OUTPUT"
-
-      # One rolling release keeps a stable download URL:
-      # https://github.com/<owner>/<repo>/releases/download/android/rakazo.apk
-      # It never becomes GitHub's "latest" release, which the desktop updater reads. An existing
-      # release is updated in place: the new APK is uploaded under a temporary name before the old
-      # one is removed, so a failed run leaves the previous download working.
-      - name: Publish rolling release
+          test -n "$FORK_ANDROID_KEYSTORE_B64"
+          test -n "$RAKAZO_FORK_KEYSTORE_PASSWORD"
+          umask 077
+          printf '%s' "$FORK_ANDROID_KEYSTORE_B64" | base64 --decode > apps/mobile/android/app/fork-release.p12
+          keytool -list -storetype PKCS12 -keystore apps/mobile/android/app/fork-release.p12 \
+            -storepass "$RAKAZO_FORK_KEYSTORE_PASSWORD" -alias rakazofork > /dev/null
+          node scripts/configure-fork-android-signing.mjs apps/mobile/android/app/build.gradle
+      - name: Build locally with Gradle and the fixed fork signing key
+        working-directory: apps/mobile/android
+        env:
+          GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx4g -Dkotlin.daemon.jvm.options=-Xmx2g
+          RAKAZO_FORK_KEYSTORE_PASSWORD: ${{ secrets.FORK_ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew :app:assembleRelease --no-daemon --stacktrace
+          apk="$(find app/build/outputs/apk/release -maxdepth 1 -type f -name '*.apk' | head -1)"
+          test -n "$apk"
+          unzip -t "$apk" >/dev/null
+          cp "$apk" "$RUNNER_TEMP/rakazo-fork.apk"
+          (cd "$RUNNER_TEMP" && sha256sum rakazo-fork.apk > rakazo-fork.apk.sha256)
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: rakazo-fork-android-apk
+          path: |
+            ${{ runner.temp }}/rakazo-fork.apk
+            ${{ runner.temp }}/rakazo-fork.apk.sha256
+          if-no-files-found: error
+      - name: Publish the fork APK without changing the desktop latest release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VERSION: ${{ steps.build.outputs.version }}
-          VERSION_CODE: ${{ steps.build.outputs.version_code }}
         run: |
           set -euo pipefail
-          title="Rakazo for Android $VERSION ($VERSION_CODE)"
-          if ! gh release view "$RELEASE_TAG" --json tagName > /dev/null 2> "$RUNNER_TEMP/view.err"; then
-            if ! grep -q "release not found" "$RUNNER_TEMP/view.err"; then
-              cat "$RUNNER_TEMP/view.err" >&2
-              exit 1
-            fi
-            gh release create "$RELEASE_TAG" "$RUNNER_TEMP/rakazo.apk" \
-              --target "$GITHUB_SHA" \
-              --title "$title" \
-              --notes "Install rakazo.apk on your Android phone. It updates itself over the air." \
+          if gh release view fork-android > /dev/null 2>&1; then
+            gh release upload fork-android "$RUNNER_TEMP/rakazo-fork.apk" "$RUNNER_TEMP/rakazo-fork.apk.sha256" --clobber
+          else
+            gh release create fork-android "$RUNNER_TEMP/rakazo-fork.apk" "$RUNNER_TEMP/rakazo-fork.apk.sha256" \
+              --target "$GITHUB_SHA" --title "Rakazo Fork Android" \
+              --notes "Standalone signed APK built entirely with local Gradle on GitHub Actions (no EAS Cloud). Package: com.linkalls.rakazo.fork. Dedicated stable fork signing key; install updates over the previous fork APK. Expo OTA disabled." \
               --latest=false
-            exit 0
           fi
-
-          staged="rakazo-$VERSION_CODE.apk"
-          cp "$RUNNER_TEMP/rakazo.apk" "$RUNNER_TEMP/$staged"
-          gh release upload "$RELEASE_TAG" "$RUNNER_TEMP/$staged" --clobber
-          assets="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" --jq '.assets')"
-          staged_id="$(jq -r --arg name "$staged" '.[] | select(.name == $name) | .id' <<< "$assets")"
-          old_id="$(jq -r '.[] | select(.name == "rakazo.apk") | .id' <<< "$assets")"
-          if [[ -z "$staged_id" ]]; then
-            echo "The uploaded $staged is missing from the release; leaving the previous APK in place." >&2
-            exit 1
-          fi
-          if [[ -n "$old_id" ]]; then
-            gh api -X DELETE "repos/$GITHUB_REPOSITORY/releases/assets/$old_id"
-          fi
-          for attempt in 1 2 3; do
-            if gh api -X PATCH "repos/$GITHUB_REPOSITORY/releases/assets/$staged_id" -f name=rakazo.apk > /dev/null; then
-              break
-            fi
-            if [[ "$attempt" == 3 ]]; then
-              echo "Could not rename $staged to rakazo.apk; rename it on the release page." >&2
-              exit 1
-            fi
-            sleep 5
-          done
-          gh api -X PATCH "repos/$GITHUB_REPOSITORY/git/refs/tags/$RELEASE_TAG" -f sha="$GITHUB_SHA" -F force=true > /dev/null
-          gh release edit "$RELEASE_TAG" --title "$title" --latest=false
