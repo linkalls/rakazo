@@ -1,4 +1,6 @@
 export const ZH_MESSAGES: Record<string, string> = {
+  "Expand editor": "展开输入框",
+  "Collapse editor": "收起输入框",
   Approvals: "审批",
   "Never ask": "从不询问",
   Auto: "自动",

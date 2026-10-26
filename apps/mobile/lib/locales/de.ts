@@ -1,4 +1,6 @@
 export const DE_MESSAGES: Record<string, string> = {
+  "Expand editor": "Editor vergrößern",
+  "Collapse editor": "Editor verkleinern",
   Approvals: "Freigaben",
   "Never ask": "Nie fragen",
   Auto: "Auto",

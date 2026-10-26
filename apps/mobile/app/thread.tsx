@@ -2936,13 +2936,12 @@ function Thread({ sessionEpoch, userId }: { sessionEpoch: number; userId: string
             </Text>
           ) : null}
           {activePendingAttachments.length ? (
-            <View
-              style={{
-                flexDirection: "row",
-                flexWrap: "wrap",
-                gap: 8,
-                marginTop: 12,
-              }}
+            <ScrollView
+              horizontal
+              keyboardShouldPersistTaps="always"
+              showsHorizontalScrollIndicator={false}
+              style={{ flexGrow: 0, flexShrink: 0, marginTop: 8 }}
+              contentContainerStyle={{ alignItems: "center", gap: 8, paddingVertical: 4 }}
             >
               {activePendingAttachments.map((attachment) => (
                 <View
@@ -2976,7 +2975,9 @@ function Thread({ sessionEpoch, userId }: { sessionEpoch: number; userId: string
                     {attachment.name}
                   </Text>
                   <Pressable
+                    accessibilityRole="button"
                     accessibilityLabel={t("Remove {name}", { name: attachment.name })}
+                    hitSlop={8}
                     onPress={() =>
                       setPendingAttachments((current) =>
                         current.filter((item) => item.id !== attachment.id),
@@ -2992,7 +2993,7 @@ function Thread({ sessionEpoch, userId }: { sessionEpoch: number; userId: string
                   </Pressable>
                 </View>
               ))}
-            </View>
+            </ScrollView>
           ) : null}
           <ThreadComposer
             key={threadKey}

@@ -1,4 +1,6 @@
 export const NL_MESSAGES: Record<string, string> = {
+  "Expand editor": "Invoerveld vergroten",
+  "Collapse editor": "Invoerveld verkleinen",
   Approvals: "Goedkeuringen",
   "Never ask": "Nooit vragen",
   Auto: "Auto",

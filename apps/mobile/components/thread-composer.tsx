@@ -13,6 +13,7 @@ import type { Ref } from "react";
 import { useImperativeHandle, useMemo, useRef, useState } from "react";
 import type { ViewStyle } from "react-native";
 import { Pressable, ScrollView, Text, TextInput, useWindowDimensions, View } from "react-native";
+import { composerViewport } from "../lib/composer-viewport";
 import { useI18n } from "../lib/i18n";
 import { useMobileTokens, useResolvedAppearance } from "../lib/native";
 import type { ComposerSnapshot } from "../lib/thread-feedback";
@@ -70,13 +71,15 @@ export function ThreadComposer({
   onSlashAction,
 }: ThreadComposerProps) {
   const tokens = useMobileTokens();
-  const { fontScale } = useWindowDimensions();
+  const { fontScale, height: windowHeight } = useWindowDimensions();
   // The input text stops growing at MAX_FONT_SCALE, so its height limits stop there too.
   const textScale = Math.min(fontScale, MAX_FONT_SCALE);
+  const viewport = composerViewport(windowHeight, textScale);
   const colorScheme = useResolvedAppearance();
   const { t } = useI18n();
   const inputRef = useRef<TextInput>(null);
   const [draft, setDraft] = useState("");
+  const [expanded, setExpanded] = useState(false);
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [slashQuery, setSlashQuery] = useState<string | null>(null);
   const [selectedMentions, setSelectedMentions] = useState<ComposerMention[]>([]);
@@ -92,6 +95,7 @@ export function ThreadComposer({
     }),
     reset: () => {
       setDraft("");
+      setExpanded(false);
       setMentionQuery(null);
       setSlashQuery(null);
       setSelectedSkill(null);
@@ -176,6 +180,7 @@ export function ThreadComposer({
     justifyContent: "center",
   } as const;
 
+  const showExpand = draft.includes("\n") || draft.length >= 120;
   const canSend =
     Boolean(draft.trim()) ||
     selectedSkill !== null ||
@@ -187,8 +192,9 @@ export function ThreadComposer({
       {mentionOptions.length ? (
         <ScrollView
           testID="mention-picker"
-          keyboardShouldPersistTaps="handled"
+          keyboardShouldPersistTaps="always"
           style={{
+            maxHeight: viewport.suggestionHeight,
             flexGrow: 0,
             flexShrink: 1,
             marginTop: 12,
@@ -235,8 +241,9 @@ export function ThreadComposer({
       {slashSkillOptions.length || slashActionOptions.length ? (
         <ScrollView
           testID="slash-picker"
-          keyboardShouldPersistTaps="handled"
+          keyboardShouldPersistTaps="always"
           style={{
+            maxHeight: viewport.suggestionHeight,
             flexGrow: 0,
             flexShrink: 1,
             marginTop: 12,
@@ -301,6 +308,41 @@ export function ThreadComposer({
           ))}
         </ScrollView>
       ) : null}
+      {showExpand ? (
+        <View style={{ alignItems: "flex-end", marginTop: 4 }}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={expanded ? t("Collapse editor") : t("Expand editor")}
+            onPress={() => {
+              setExpanded((current) => !current);
+              inputRef.current?.focus();
+            }}
+            hitSlop={8}
+            style={{
+              minHeight: 32,
+              minWidth: 44,
+              alignItems: "center",
+              justifyContent: "center",
+              flexDirection: "row",
+              gap: 5,
+            }}
+          >
+            <NativeSymbol
+              ios={
+                expanded
+                  ? "arrow.down.right.and.arrow.up.left"
+                  : "arrow.up.left.and.arrow.down.right"
+              }
+              android={expanded ? "contract-outline" : "expand-outline"}
+              size={15}
+              color={tokens.mutedForeground}
+            />
+            <Text style={{ color: tokens.mutedForeground, fontSize: 12 }}>
+              {expanded ? t("Collapse editor") : t("Expand editor")}
+            </Text>
+          </Pressable>
+        </View>
+      ) : null}
       <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 10, marginTop: 8 }}>
         <MenuView
           actions={attachActions}
@@ -326,6 +368,7 @@ export function ThreadComposer({
           shape="roundedRectangle"
           style={{
             flex: 1,
+            minWidth: 0,
             minHeight: 44,
             borderRadius: 22,
             flexDirection: "row",
@@ -487,7 +530,7 @@ export function ThreadComposer({
                   padding: 0,
                   // Native text and lineHeight scale with Dynamic Type; the viewport must too.
                   minHeight: 22 * textScale,
-                  maxHeight: 110 * textScale,
+                  maxHeight: expanded ? viewport.expandedInputHeight : viewport.compactInputHeight,
                   writingDirection: "auto",
                 }}
               />

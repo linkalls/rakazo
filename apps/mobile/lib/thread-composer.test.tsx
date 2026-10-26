@@ -12,7 +12,7 @@ import { ThreadComposer } from "../components/thread-composer";
 import { settleComposer } from "./thread-feedback";
 import { useThreadMentionCatalog } from "./thread-mention-catalog";
 
-const dimensions = vi.hoisted(() => ({ fontScale: 1 }));
+const dimensions = vi.hoisted(() => ({ fontScale: 1, height: 820 }));
 
 const input = vi.hoisted(() => ({
   change: (_value: string) => {},
@@ -191,6 +191,7 @@ describe("thread composer isolation", () => {
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
     vi.clearAllMocks();
     dimensions.fontScale = 1;
+    dimensions.height = 820;
     threadRenders = 0;
     mentionApi.generation = 1;
     mentionApi.rpc.mockReset().mockResolvedValue([]);
@@ -401,7 +402,8 @@ describe("thread composer isolation", () => {
         expect(fieldStyle.paddingBottom).toBeUndefined();
         expect(field.dataset.scrollEnabled).toBe("true");
         expect(fieldStyle.minHeight).toBe(fieldStyle.lineHeight * textScale);
-        expect(fieldStyle.maxHeight).toBe(5 * fieldStyle.lineHeight * textScale);
+        expect(fieldStyle.maxHeight).toBeLessThanOrEqual(5 * fieldStyle.lineHeight * textScale);
+        expect(fieldStyle.maxHeight).toBeGreaterThanOrEqual(fieldStyle.minHeight);
         expect(fieldStyle.height).toBeUndefined();
         expect(fieldStyle.writingDirection).toBe("auto");
       }
@@ -409,6 +411,35 @@ describe("thread composer isolation", () => {
       expect(container.querySelector("input")!.value).toBe("");
     },
   );
+
+  it("expands long input without losing the draft, then collapses and resets on send", () => {
+    type("First line\nSecond line");
+    const field = () => container.querySelector("input")!;
+    const style = () => JSON.parse(field().dataset.style!);
+    const compactHeight = style().maxHeight;
+    press("Expand editor");
+    expect(style().maxHeight).toBeGreaterThan(compactHeight);
+    expect(composer.current!.snapshot().promptText).toBe("First line\nSecond line");
+    press("Collapse editor");
+    expect(style().maxHeight).toBe(compactHeight);
+    press("Expand editor");
+    act(() => composer.current!.reset());
+    expect(field().value).toBe("");
+    expect(container.querySelector('button[aria-label="Expand editor"]')).toBeNull();
+  });
+
+  it("bounds completion lists on small screens so Send and the current draft remain accessible", () => {
+    dimensions.height = 360;
+    render();
+    type("@He");
+    const list = container.querySelector('[data-testid="mention-picker"]')!;
+    const listStyle = JSON.parse(list.getAttribute("data-style")!);
+    expect(listStyle.maxHeight).toBeLessThanOrEqual(100);
+    expect(listStyle.maxHeight).toBeGreaterThanOrEqual(72);
+    const fieldStyle = JSON.parse(container.querySelector("input")!.dataset.style!);
+    expect(fieldStyle.maxHeight).toBeLessThanOrEqual(360 * 0.21);
+    expect(composer.current!.snapshot().promptText).toBe("@He");
+  });
 
   it("insets the call and send pills equally from the capsule's bottom and trailing edges", () => {
     const style = (element: Element) => JSON.parse((element as HTMLElement).dataset.style!);

@@ -1,4 +1,6 @@
 export const RU_MESSAGES: Record<string, string> = {
+  "Expand editor": "Развернуть поле ввода",
+  "Collapse editor": "Свернуть поле ввода",
   Approvals: "Одобрения",
   "Never ask": "Не спрашивать",
   Auto: "Авто",

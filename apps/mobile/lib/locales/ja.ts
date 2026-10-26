@@ -1,4 +1,6 @@
 export const JA_MESSAGES: Record<string, string> = {
+  "Expand editor": "入力欄を広げる",
+  "Collapse editor": "入力欄を縮める",
   Approvals: "承認",
   "Never ask": "確認しない",
   Auto: "自動",
