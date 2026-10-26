@@ -180,7 +180,8 @@ jobs:
 
   publish-mobile-update:
     name: Publish compatible mobile update
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Forks must never publish JavaScript to the original app's production OTA channel.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.event.repository.fork == false
     needs: [lint, check, build, test, test-integration, test-e2e]
     runs-on: ubuntu-latest
     timeout-minutes: 20
