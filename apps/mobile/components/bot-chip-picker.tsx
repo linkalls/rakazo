@@ -37,12 +37,17 @@ export function BotChipPicker({
           flexWrap: "wrap",
           alignItems: "center",
           gap: 8,
+          minHeight: 58,
           padding: 12,
-          borderRadius: 11,
-          backgroundColor: native.fill,
+          borderRadius: 18,
+          borderWidth: 1,
+          borderColor: tokens.border,
+          backgroundColor: native.groupedCell,
         }}
       >
-        <Text style={{ color: tokens.mutedForeground, fontSize: 16 }}>{t("To:")}</Text>
+        <Text style={{ color: tokens.mutedForeground, fontSize: 13, fontWeight: "600" }}>
+          {t("To:")}
+        </Text>
         {selected.map((id) => {
           const bot = bots.find((item) => item.id === id);
           return bot ? (
@@ -55,8 +60,9 @@ export function BotChipPicker({
                 flexDirection: "row",
                 alignItems: "center",
                 gap: 6,
-                padding: 5,
-                borderRadius: 16,
+                paddingVertical: 6,
+                paddingHorizontal: 9,
+                borderRadius: 999,
                 backgroundColor: native.fillPressed,
                 opacity: pressed ? 0.6 : 1,
                 maxWidth: "100%",
@@ -115,12 +121,38 @@ export function BotChipPicker({
               flexDirection: "row",
               alignItems: "center",
               gap: 12,
-              paddingVertical: 12,
-              opacity: pressed ? 0.6 : 1,
+              minHeight: 60,
+              paddingVertical: 10,
+              paddingHorizontal: 12,
+              borderRadius: 16,
+              marginBottom: 5,
+              backgroundColor: native.groupedCell,
+              opacity: pressed ? 0.65 : 1,
             })}
           >
-            <BotAvatar color={bot.color} identity={bot.id} size={36} status={bot.status} />
-            <Text style={{ color: tokens.foreground, fontSize: 16, flex: 1 }}>{bot.name}</Text>
+            <BotAvatar color={bot.color} identity={bot.id} size={38} status={bot.status} />
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text
+                numberOfLines={1}
+                style={{ color: tokens.foreground, fontSize: 16, fontWeight: "500" }}
+              >
+                {bot.name}
+              </Text>
+              {bot.title ? (
+                <Text
+                  numberOfLines={1}
+                  style={{ color: tokens.mutedForeground, fontSize: 13, marginTop: 2 }}
+                >
+                  {bot.title}
+                </Text>
+              ) : null}
+            </View>
+            <NativeSymbol
+              ios="plus.circle"
+              android="add-circle-outline"
+              size={21}
+              color={tokens.mutedForeground}
+            />
           </Pressable>
         ))}
       </View>
