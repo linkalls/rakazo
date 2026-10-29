@@ -8,8 +8,8 @@ const workflow = readFileSync(
 );
 
 describe("independent Android fork APK workflow", () => {
-  it("is a manual fork-only build with no EAS Cloud or upstream credentials", () => {
-    expect(workflow).toMatch(/^on:\n {2}workflow_dispatch:\n\n/m);
+  it("is a fork-only dispatch or callable build without EAS Cloud or upstream credentials", () => {
+    expect(workflow).toMatch(/^on:\n {2}workflow_dispatch:\n {2}workflow_call:\n\n/m);
     expect(workflow).toContain("permissions:\n  contents: read");
     expect(workflow).toContain("github.repository == 'linkalls/rakazo'");
     expect(workflow).toContain("github.ref == 'refs/heads/main'");
